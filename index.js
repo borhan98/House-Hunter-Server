@@ -4,7 +4,7 @@ const cors = require("cors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
 
 // Middlewares
@@ -28,6 +28,7 @@ async function run() {
         // all collections
         const userCollection = client.db("HouseHunter").collection("users");
         const houseCollection = client.db("HouseHunter").collection("houses");
+        const bookingCollection = client.db("HouseHunter").collection("bookings");
 
         // verify token
         const verifyToken = async (req, res, next) => {
@@ -92,9 +93,46 @@ async function run() {
         /*-----------------------------------------------
                     House Related APIs
         ------------------------------------------------*/
+        app.get("/houses", async (req, res) => {
+            const result = await houseCollection.find().toArray();
+            res.send(result);
+        })
+
+        app.get("/houses/:id", async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await houseCollection.findOne(query);
+            res.send(result);
+        })
+
         app.post("/houses", async (req, res) => {
             const newHouse = req.body;
             const result = await houseCollection.insertOne(newHouse);
+            res.send(result);
+        })
+
+
+        /*-----------------------------------------------
+                    Booking Related APIs
+        ------------------------------------------------*/
+
+        app.post("/bookings", async (req, res) => {
+            const newBooking = req.body;
+            const query = { email: newBooking.email };
+            const filter = { house_id: newBooking.house_id };
+            const userBookings = await bookingCollection.find(query).toArray();
+
+            // check if user already booked 2 houses
+            if (userBookings?.length >= 2) {
+                return res.send({ message: "You can't book more than 2 house!" });
+            }
+            // check if user is going to duplicate booking
+            if (userBookings?.length === 1) {
+                if (userBookings[0].house_id === newBooking.house_id) {
+                    return res.send({ message: "You have already booked this house." })
+                }
+            }
+            const result = await bookingCollection.insertOne(newBooking);
             res.send(result);
         })
 
