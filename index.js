@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 require('dotenv').config();
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const port = process.env.PORT || 5000;
@@ -27,10 +28,33 @@ async function run() {
         // all collections
         const userCollection = client.db("HouseHunter").collection("users");
 
+        // verify token
+        const verifyToken = async (req, res, next) => {
+            const token = req.headers?.authorization?.split(" ")[1];
+            if (!token) {
+                return res.status(401).send({ message: "Unauthorized access" });
+            }
+            jwt.verify(token, process.env.TOKEN_SECRET, (err, decoded) => {
+                if (err) {
+                    return res.status(401).send({ message: "Unauthorized access" });
+                }
+                req.decoded = decoded;
+                next();
+            })
+        }
+
 
         /*-----------------------------------------------
                     User Related APIs
         ------------------------------------------------*/
+        app.get("/user", verifyToken, async (req, res) => {
+            // TODO: when user login, then load the specific user's data
+            const user = req.decoded;
+            const query = { email: user?.email };
+            const result = await userCollection.findOne(query);
+            res.send(result);
+        })
+
         app.post("/register", async (req, res) => {
             let newUser = req.body;
             const query = { email: newUser.email }
@@ -45,6 +69,25 @@ async function run() {
             const result = await userCollection.insertOne(newUser);
             res.send(result)
         })
+
+        app.post("/login", async (req, res) => {
+            const { email, password } = req.body;
+            const query = { email };
+            const user = await userCollection.findOne(query);
+            if (!user) {
+                return res.send({ message: "Invalid Username" });
+            }
+
+            // Check the password
+            const validPass = await bcrypt.compare(password, user.password);
+            if (!validPass) {
+                return res.send({ message: "Invalid password" });
+            }
+            // Generate token
+            const token = jwt.sign(user, process.env.TOKEN_SECRET, { expiresIn: "1h" });
+            res.send({ token, user });
+        })
+
 
 
         // Send a ping to confirm a successful connection
