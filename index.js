@@ -27,6 +27,7 @@ async function run() {
     try {
         // all collections
         const userCollection = client.db("HouseHunter").collection("users");
+        const houseCollection = client.db("HouseHunter").collection("houses");
 
         // verify token
         const verifyToken = async (req, res, next) => {
@@ -88,6 +89,14 @@ async function run() {
             res.send({ token, user });
         })
 
+        /*-----------------------------------------------
+                    House Related APIs
+        ------------------------------------------------*/
+        app.post("/houses", async (req, res) => {
+            const newHouse = req.body;
+            const result = await houseCollection.insertOne(newHouse);
+            res.send(result);
+        })
 
 
         // Send a ping to confirm a successful connection
