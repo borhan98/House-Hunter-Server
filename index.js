@@ -94,7 +94,26 @@ async function run() {
                     House Related APIs
         ------------------------------------------------*/
         app.get("/houses", async (req, res) => {
-            const result = await houseCollection.find().toArray();
+            const priceRange = req.query?.priceRange?.split("-");
+            const roomSize = req.query?.roomSize;
+            const searchValue = req.query?.searchValue;
+            console.log(searchValue);
+            const query = {};
+            // get house by name
+            if (searchValue) {
+                query.name = { $regex: searchValue, $options: "i" };
+            }
+            // get house by roomSize
+            if (roomSize) {
+                query.room_size = { $regex: roomSize, $options: "i" };
+            }
+            // get house between a price range
+            if (priceRange) {
+                if (priceRange[0]) {
+                    query.rent_per_month = { $gte: parseFloat(priceRange[0]), $lte: parseFloat(priceRange[1]) }
+                }
+            }
+            const result = await houseCollection.find(query).toArray();
             res.send(result);
         })
 
@@ -111,10 +130,52 @@ async function run() {
             res.send(result);
         })
 
+        app.delete("/houses/:id", async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await houseCollection.deleteOne(query);
+            res.send(result);
+        })
+
+        app.put("/houses/:id", async (req, res) => {
+            const updateHouse = req.body;
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const options = { upsert: true };
+            const updatedDoc = {
+                $set: {
+                    name: updateHouse.name,
+                    address: updateHouse.address,
+                    city: updateHouse.city,
+                    bedrooms: parseInt(updateHouse.bedrooms),
+                    bathrooms: parseInt(updateHouse.bathrooms),
+                    room_size: updateHouse.room_size,
+                    availability_date: updateHouse.availability_date,
+                    rent_per_month: parseFloat(updateHouse.rent_per_month),
+                    phone: updateHouse.phone,
+                    description: updateHouse.description,
+                    photo: updateHouse.photo,
+                    email: updateHouse.email,
+                    user_name: updateHouse.user_name
+                }
+            }
+            const result = await houseCollection.updateOne(query, updatedDoc, options);
+            res.send(result);
+        })
+
 
         /*-----------------------------------------------
                     Booking Related APIs
         ------------------------------------------------*/
+        app.get("/bookings", async (req, res) => {
+            const email = req.query?.email;
+            const query = { email: email };
+            const options = {
+                projection: { house_id: 1, email: 1 }
+            }
+            const result = await bookingCollection.find(query, options).toArray();
+            res.send(result);
+        })
 
         app.post("/bookings", async (req, res) => {
             const newBooking = req.body;
